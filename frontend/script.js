@@ -5,9 +5,11 @@ let mainNetwork = null;
 let miniNetwork = null;
 let crossSellingData = null;
 
-// API configuration
-const API_URL = 'http://127.0.0.1:8000/api/analyze';
-const HEALTH_URL = 'http://127.0.0.1:8000/health';
+// API configuration (Adaptive for local & Vercel deployment)
+const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+const BACKEND_BASE = isLocal ? 'http://127.0.0.1:8000' : window.location.origin;
+const API_URL = `${BACKEND_BASE}/api/analyze`;
+const HEALTH_URL = `${BACKEND_BASE}/health`;
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://ewvjojmexowbiswqffnu.supabase.co';

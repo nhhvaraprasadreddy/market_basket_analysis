@@ -1,0 +1,54 @@
+{
+  "algorithm": "Apriori",
+  "rules": [
+    {
+      "antecedent": ["Bread"],
+      "consequent": ["Butter"],
+      "support": 0.2200,
+      "confidence": 0.8000,
+      "lift": 1.4500
+    },
+    {
+      "antecedent": ["Milk"],
+      "consequent": ["Eggs"],
+      "support": 0.1800,
+      "confidence": 0.7500,
+      "lift": 1.3200
+    },
+    {
+      "antecedent": ["Rice"],
+      "consequent": ["Beef"],
+      "support": 0.1500,
+      "confidence": 0.6800,
+      "lift": 1.2800
+    },
+    {
+      "antecedent": ["Oranges"],
+      "consequent": ["Potatoes"],
+      "support": 0.1200,
+      "confidence": 0.6200,
+      "lift": 1.1500
+    }
+  ],
+  "frequent_items": [
+    {"item": "Bread", "frequency": 320},
+    {"item": "Milk", "frequency": 290},
+    {"item": "Eggs", "frequency": 275},
+    {"item": "Butter", "frequency": 250},
+    {"item": "Rice", "frequency": 230},
+    {"item": "Beef", "frequency": 220},
+    {"item": "Oranges", "frequency": 200},
+    {"item": "Potatoes", "frequency": 180},
+    {"item": "Cheese", "frequency": 160},
+    {"item": "Chicken", "frequency": 150}
+  ],
+  "analysis_info": {
+    "total_transactions": 2500,
+    "total_items": 15,
+    "parameters": {
+      "min_support": 0.005,
+      "min_confidence": 0.1,
+      "min_lift": 1.0
+    }
+  }
+}

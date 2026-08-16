@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualization Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>🧪 Visualization Test</h2>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📊 Test Chart</h5>
+                    </div>
+                    <div class="card-body" style="height: 350px; position: relative;">
+                        <canvas id="testChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>🔗 Test Network</h5>
+                    </div>
+                    <div class="card-body" style="height: 350px; position: relative;">
+                        <div id="testNetwork" style="width: 100%; height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <button id="testBtn" class="btn btn-primary mt-3">🧪 Test Visualizations</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // Test data matching your backend format
+        const testData = {
+            "frequent_items": [
+                {"item": "Bread", "frequency": 320},
+                {"item": "Milk", "frequency": 290},
+                {"item": "Eggs", "frequency": 275},
+                {"item": "Butter", "frequency": 250},
+                {"item": "Rice", "frequency": 230}
+            ],
+            "rules": [
+                {
+                    "antecedent": ["Bread"],
+                    "consequent": ["Butter"],
+                    "support": 0.2200,
+                    "confidence": 0.8000,
+                    "lift": 1.4500
+                },
+                {
+                    "antecedent": ["Milk"],
+                    "consequent": ["Eggs"],
+                    "support": 0.1800,
+                    "confidence": 0.7500,
+                    "lift": 1.3200
+                }
+            ]
+        };
+
+        let testChart = null;
+
+        function testFrequentItemsChart(frequent_items) {
+            const ctx = document.getElementById('testChart');
+            
+            if (testChart) {
+                testChart.destroy();
+            }
+            
+            const labels = frequent_items.map(item => item.item);
+            const data = frequent_items.map(item => item.frequency);
+            
+            testChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: data,
+                        backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            console.log('✅ Test chart created');
+        }
+
+        function testNetworkGraph(rules) {
+            const container = d3.select('#testNetwork');
+            container.selectAll('*').remove();
+            
+            const width = 400;
+            const height = 300;
+            
+            const svg = container.append('svg')
+                .attr('width', width)
+                .attr('height', height)
+                .style('border', '1px solid #dee2e6');
+            
+            // Create simple nodes and links
+            const nodes = [
+                {id: 'Bread', group: 1},
+                {id: 'Butter', group: 2},
+                {id: 'Milk', group: 1},
+                {id: 'Eggs', group: 2}
+            ];
+            
+            const links = [
+                {source: 'Bread', target: 'Butter'},
+                {source: 'Milk', target: 'Eggs'}
+            ];
+            
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+            
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(links)
+                .enter().append('line')
+                .attr('stroke', '#999')
+                .attr('stroke-width', 2);
+            
+            const node = svg.append('g')
+                .selectAll('circle')
+                .data(nodes)
+                .enter().append('circle')
+                .attr('r', 15)
+                .attr('fill', d => d.group === 1 ? '#0d6efd' : '#198754');
+            
+            const text = svg.append('g')
+                .selectAll('text')
+                .data(nodes)
+                .enter().append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', '.35em')
+                .attr('font-size', '10px')
+                .attr('fill', '#fff')
+                .text(d => d.id);
+            
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+                
+                text
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+            
+            console.log('✅ Test network created');
+        }
+
+        document.getElementById('testBtn').addEventListener('click', () => {
+            console.log('🧪 Testing visualizations...');
+            testFrequentItemsChart(testData.frequent_items);
+            testNetworkGraph(testData.rules);
+        });
+    </script>
+</body>
+</html>

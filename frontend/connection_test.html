@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Market Basket Analysis - Connection Test</h1>
+    
+    <div id="results"></div>
+    
+    <button onclick="testConnection()">Test Backend Connection</button>
+    <button onclick="testHealthEndpoint()">Test Health Endpoint</button>
+    <button onclick="testCORS()">Test CORS</button>
+    
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        async function testConnection() {
+            addResult('🔍 Testing basic connection...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Connection successful: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    addResult(`❌ Connection failed: Status ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Connection error: ${error.message}`, 'error');
+                if (error.message.includes('Failed to fetch')) {
+                    addResult('💡 This usually means the backend server is not running. Please run start_backend.bat', 'info');
+                }
+            }
+        }
+        
+        async function testHealthEndpoint() {
+            addResult('🏥 Testing health endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Health check passed: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    addResult(`❌ Health check failed: Status ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Health check error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCORS() {
+            addResult('🌐 Testing CORS configuration...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/analyze`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST'
+                    }
+                });
+                
+                addResult(`✅ CORS preflight successful: Status ${response.status}`, 'success');
+                
+                // Check CORS headers
+                const corsHeaders = [
+                    'Access-Control-Allow-Origin',
+                    'Access-Control-Allow-Methods', 
+                    'Access-Control-Allow-Headers'
+                ];
+                
+                corsHeaders.forEach(header => {
+                    const value = response.headers.get(header);
+                    if (value) {
+                        addResult(`📋 ${header}: ${value}`, 'info');
+                    }
+                });
+                
+            } catch (error) {
+                addResult(`❌ CORS test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-run tests on page load
+        window.onload = function() {
+            addResult('🚀 Starting automatic connection tests...', 'info');
+            setTimeout(testConnection, 500);
+            setTimeout(testHealthEndpoint, 1000);
+            setTimeout(testCORS, 1500);
+        };
+    </script>
+</body>
+</html>

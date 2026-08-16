@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MBA Debug Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <h1>MBA Debug Test</h1>
+    <button onclick="testAPI()">Test API</button>
+    <div id="results"></div>
+    <canvas id="testChart" width="400" height="200"></canvas>
+    <div id="testNetwork"></div>
+    
+    <script>
+        async function testAPI() {
+            const formData = new FormData();
+            
+            // Create a simple test file
+            const csvContent = `Transaction_ID,Item_Name
+T001,Bread
+T001,Butter
+T002,Bread
+T002,Milk
+T003,Milk
+T003,Eggs`;
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            formData.append('file', blob, 'test.csv');
+            formData.append('min_support', '0.1');
+            formData.append('min_confidence', '0.1');
+            formData.append('min_lift', '1.0');
+            formData.append('algorithm', 'Apriori');
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                console.log('API Response:', result);
+                
+                document.getElementById('results').innerHTML = `
+                    <h3>API Response:</h3>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+                
+                // Test chart
+                if (result.frequent_items && result.frequent_items.length > 0) {
+                    const ctx = document.getElementById('testChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: result.frequent_items.map(item => item.item),
+                            datasets: [{
+                                label: 'Frequency',
+                                data: result.frequent_items.map(item => item.frequency),
+                                backgroundColor: 'rgba(54, 162, 235, 0.8)'
+                            }]
+                        }
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

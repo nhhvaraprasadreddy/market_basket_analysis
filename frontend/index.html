@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Basket Analysis & Cross-Selling Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            margin-bottom: 1.5rem;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            font-weight: 600;
+        }
+        .cross-selling-section {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        .suggestion-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-left: 4px solid #ffd700;
+        }
+        .metric-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            margin: 0.2rem;
+            display: inline-block;
+        }
+        .network-container {
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .mini-network-container {
+            border: 2px solid #17a2b8;
+            border-radius: 8px;
+            background: #e3f2fd;
+            height: 300px;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        .recommendation-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .cross-sell-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .product-selector {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .alert-custom {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <h1 class="display-4 mb-0">
+                <i class="fas fa-shopping-cart me-3"></i>
+                Market Basket Analysis & Cross-Selling Dashboard
+            </h1>
+            <p class="lead mb-0">Advanced Analytics with Apriori & FP-Growth Algorithms</p>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Alert Container -->
+        <div id="alertContainer"></div>
+
+        <div class="row">
+            <!-- Left Panel: Upload & Configuration -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-upload me-2"></i>Upload & Configure Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="analysisForm">
+                            <div class="mb-3">
+                                <label for="csvFile" class="form-label">
+                                    <i class="fas fa-file-csv me-1"></i>CSV File
+                                </label>
+                                <input type="file" class="form-control" id="csvFile" accept=".csv" required>
+                                <div class="form-text">Upload transaction data (Transaction_ID, Item_Name)</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="algorithm" class="form-label">
+                                    <i class="fas fa-cogs me-1"></i>Algorithm
+                                </label>
+                                <select class="form-select" id="algorithm">
+                                    <option value="Apriori">Apriori (Traditional)</option>
+                                    <option value="FP-Growth">FP-Growth (Fast)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="minSupport" class="form-label">Min Support</label>
+                                        <input type="number" class="form-control" id="minSupport" value="0.005" step="0.001" min="0.001" max="1">
+                                        <div class="form-text">0.001-0.1</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="minConfidence" class="form-label">Min Confidence</label>
+                                        <input type="number" class="form-control" id="minConfidence" value="0.1" step="0.01" min="0" max="1">
+                                        <div class="form-text">0.1-0.9</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="minLift" class="form-label">Min Lift</label>
+                                <input type="number" class="form-control" id="minLift" value="1.0" step="0.1" min="0">
+                                <div class="form-text">1.0+ for positive correlation</div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100 mb-2">
+                                <span id="analyzeText"><i class="fas fa-play me-2"></i>Run Analysis</span>
+                                <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none me-2"></span>
+                            </button>
+                        </form>
+                        
+                        <button id="downloadBtn" class="btn btn-success w-100 d-none">
+                            <i class="fas fa-download me-2"></i>Export Results
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cross-Selling Product Selector -->
+                <div class="card d-none" id="crossSellingCard">
+                    <div class="card-header">
+                        <h5><i class="fas fa-exchange-alt me-2"></i>Cross-Selling Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="product-selector">
+                            <label for="productSelector" class="form-label">
+                                <i class="fas fa-search me-1"></i>Select Product for Cross-Selling
+                            </label>
+                            <select class="form-select mb-3" id="productSelector">
+                                <option value="">Choose a product...</option>
+                            </select>
+                            <button id="showCrossBtn" class="btn btn-info w-100" disabled>
+                                <i class="fas fa-chart-network me-2"></i>Show Cross-Selling Opportunities
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Results -->
+            <div class="col-lg-8">
+                <!-- Main Visualizations Row -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-chart-bar me-2"></i>Top Frequent Items</h5>
+                            </div>
+                            <div class="card-body" style="height: 400px; position: relative;">
+                                <canvas id="frequentItemsChart" width="400" height="350"></canvas>
+                                <div id="chartEmptyState" class="text-center text-muted py-5 d-none">
+                                    <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                                    <p>No data to display</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-project-diagram me-2"></i>Item Relationships Network</h5>
+                            </div>
+                            <div class="card-body" style="height: 400px; position: relative;">
+                                <div id="networkGraph" style="width: 100%; height: 350px; border: 1px solid #ddd;"></div>
+                                <div id="networkEmptyState" class="text-center text-muted py-5 d-none">
+                                    <i class="fas fa-project-diagram fa-3x mb-3"></i>
+                                    <p>No relationships to display</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cross-Selling Results Section -->
+                <div id="crossSellingResults" class="d-none">
+                    <div class="cross-selling-section">
+                        <h4><i class="fas fa-bullseye me-2"></i>Cross-Selling Opportunities</h4>
+                        <div id="selectedProductInfo" class="mb-3"></div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-list me-2"></i>Top Recommendations</h6>
+                                <div id="crossSellSuggestions"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-sitemap me-2"></i>Relationship Network</h6>
+                                <div id="miniNetworkGraph" style="width: 100%; height: 280px; border: 1px solid #ddd;"></div>
+                            </div>
+                        </div>
+                        
+                        <div id="recommendationText" class="recommendation-box mt-3"></div>
+                    </div>
+
+                    <!-- Cross-Selling Table -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-table me-2"></i>Detailed Cross-Selling Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive cross-sell-table">
+                                <table id="crossSellTable" class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Related Item</th>
+                                            <th>Cross-Sell Score</th>
+                                            <th>Confidence</th>
+                                            <th>Lift</th>
+                                            <th>Co-occurrence</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Association Rules Table -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-rules me-2"></i>Association Rules</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="rulesTable" class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Antecedent</th>
+                                        <th>Consequent</th>
+                                        <th>Support</th>
+                                        <th>Confidence</th>
+                                        <th>Lift</th>
+                                        <th>Cross-Sell Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div class="loading-spinner" id="loadingModal">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+        <p class="mt-3">Analyzing data...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

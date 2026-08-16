@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Graph Test</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #networkGraph {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #ccc;
+            margin: 20px auto;
+        }
+        .container {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Network Graph Test</h1>
+        <div id="networkGraph"></div>
+        <button onclick="testNetwork()">Test Network with Sample Data</button>
+    </div>
+
+    <script>
+        function testNetwork() {
+            // Sample association rules data
+            const sampleRules = [
+                {
+                    "antecedent": ["Bread"],
+                    "consequent": ["Butter"],
+                    "support": 0.22,
+                    "confidence": 0.8,
+                    "lift": 1.4,
+                    "cross_selling_score": 1.12
+                },
+                {
+                    "antecedent": ["Milk"],
+                    "consequent": ["Cookies"],
+                    "support": 0.18,
+                    "confidence": 0.75,
+                    "lift": 2.1,
+                    "cross_selling_score": 1.58
+                },
+                {
+                    "antecedent": ["Bread", "Butter"],
+                    "consequent": ["Jam"],
+                    "support": 0.15,
+                    "confidence": 0.68,
+                    "lift": 1.8,
+                    "cross_selling_score": 1.22
+                },
+                {
+                    "antecedent": ["Coffee"],
+                    "consequent": ["Sugar"],
+                    "support": 0.25,
+                    "confidence": 0.85,
+                    "lift": 1.6,
+                    "cross_selling_score": 1.36
+                }
+            ];
+
+            drawNetworkGraph(sampleRules);
+        }
+
+        function drawNetworkGraph(rules) {
+            const container = document.getElementById('networkGraph');
+            
+            // Create nodes and edges from rules
+            const nodes = new Map();
+            const edges = [];
+            const nodeConnections = new Map();
+            
+            rules.forEach((rule, ruleIndex) => {
+                const allAntecedents = Array.isArray(rule.antecedent) ? rule.antecedent : [rule.antecedent];
+                const allConsequents = Array.isArray(rule.consequent) ? rule.consequent : [rule.consequent];
+                
+                // Add all items as nodes
+                [...allAntecedents, ...allConsequents].forEach(item => {
+                    if (!nodes.has(item)) {
+                        if (!nodeConnections.has(item)) {
+                            nodeConnections.set(item, 0);
+                        }
+                        nodeConnections.set(item, nodeConnections.get(item) + 1);
+                        
+                        const isAntecedent = allAntecedents.includes(item);
+                        const nodeSize = 15 + Math.min(nodeConnections.get(item) * 2, 20);
+                        
+                        nodes.set(item, {
+                            id: item,
+                            label: item.length > 12 ? item.substring(0, 12) + '...' : item,
+                            title: `${item}\\nConnections: ${nodeConnections.get(item)}`,
+                            color: {
+                                background: isAntecedent ? '#667eea' : '#f093fb',
+                                border: isAntecedent ? '#5a67d8' : '#e879f9',
+                                highlight: { background: '#ffd700', border: '#ffb300' }
+                            },
+                            font: { color: 'white', size: 11, bold: true },
+                            size: nodeSize,
+                            borderWidth: 2
+                        });
+                    }
+                });
+                
+                // Create edges
+                allAntecedents.forEach(ant => {
+                    allConsequents.forEach(cons => {
+                        if (ant !== cons) {
+                            const edgeWidth = Math.min(Math.max(rule.lift * 1.5, 1), 6);
+                            const edgeColor = rule.lift > 2 ? '#ff6b6b' : rule.lift > 1.5 ? '#4ecdc4' : '#95a5a6';
+                            
+                            edges.push({
+                                from: ant,
+                                to: cons,
+                                width: edgeWidth,
+                                color: { 
+                                    color: edgeColor, 
+                                    opacity: 0.8,
+                                    highlight: '#ffd700'
+                                },
+                                title: `${ant} → ${cons}\\nSupport: ${rule.support.toFixed(3)}\\nConfidence: ${rule.confidence.toFixed(3)}\\nLift: ${rule.lift.toFixed(3)}\\nCross-sell Score: ${rule.cross_selling_score.toFixed(3)}`,
+                                arrows: { 
+                                    to: { 
+                                        enabled: true, 
+                                        scaleFactor: 0.8,
+                                        type: 'arrow'
+                                    } 
+                                },
+                                smooth: {
+                                    enabled: true,
+                                    type: 'curvedCW',
+                                    roundness: 0.2
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+            
+            const nodeArray = Array.from(nodes.values());
+            console.log('Created', nodeArray.length, 'nodes and', edges.length, 'edges');
+            
+            const data = { nodes: nodeArray, edges: edges };
+            const options = {
+                physics: {
+                    enabled: true,
+                    solver: 'forceAtlas2Based',
+                    forceAtlas2Based: {
+                        gravitationalConstant: -50,
+                        centralGravity: 0.01,
+                        springLength: 100,
+                        springConstant: 0.08,
+                        damping: 0.4,
+                        avoidOverlap: 1
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 150,
+                        updateInterval: 25
+                    }
+                },
+                layout: {
+                    improvedLayout: true,
+                    clusterThreshold: 150
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 200,
+                    hideEdgesOnDrag: false,
+                    hideNodesOnDrag: false
+                },
+                nodes: {
+                    shape: 'dot',
+                    scaling: {
+                        min: 10,
+                        max: 30
+                    }
+                },
+                edges: {
+                    scaling: {
+                        min: 1,
+                        max: 8
+                    }
+                }
+            };
+            
+            const network = new vis.Network(container, data, options);
+            
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    console.log('Node clicked:', nodeId);
+                }
+            });
+            
+            network.on('stabilizationIterationsDone', function() {
+                console.log('Network stabilization complete');
+            });
+            
+            console.log('Network graph created successfully');
+        }
+
+        // Auto-test on load
+        window.onload = function() {
+            testNetwork();
+        };
+    </script>
+</body>
+</html>

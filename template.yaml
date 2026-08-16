@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Market Basket Analysis Web Application
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.9
+
+Resources:
+  MBAFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: app.handler
+      Events:
+        MBAApi:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            RestApiId: !Ref MBAApi
+      Environment:
+        Variables:
+          CORS_ORIGIN: "*"
+
+  MBAApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  MBAWebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-mba-website"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  MBAWebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MBAWebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "${MBAWebsiteBucket}/*"
+
+Outputs:
+  MBAApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${MBAApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+    Export:
+      Name: !Sub "${AWS::StackName}-api-url"
+
+  MBAWebsiteUrl:
+    Description: "S3 Website URL"
+    Value: !GetAtt MBAWebsiteBucket.WebsiteURL
+    Export:
+      Name: !Sub "${AWS::StackName}-website-url"
+
+  MBAWebsiteBucket:
+    Description: "S3 Bucket for website hosting"
+    Value: !Ref MBAWebsiteBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-website-bucket"

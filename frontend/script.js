@@ -9,11 +9,27 @@ let crossSellingData = null;
 const API_URL = 'http://127.0.0.1:8000/api/analyze';
 const HEALTH_URL = 'http://127.0.0.1:8000/health';
 
+// Supabase Configuration
+const SUPABASE_URL = 'https://ewvjojmexowbiswqffnu.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_OdkqfkLCfHp_ZNutK85R6Q_oCH9tfcV';
+let supabaseClient = null;
+
+try {
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log('✅ Supabase client connected successfully');
+    }
+} catch (e) {
+    console.warn('⚠️ Supabase init notice:', e);
+}
+
 // DOM elements
 const form = document.getElementById('analysisForm');
 const analyzeText = document.getElementById('analyzeText');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const downloadBtn = document.getElementById('downloadBtn');
+const saveSupabaseBtn = document.getElementById('saveSupabaseBtn');
+const openHistoryModalBtn = document.getElementById('openHistoryModalBtn');
 const alertContainer = document.getElementById('alertContainer');
 const crossSellingCard = document.getElementById('crossSellingCard');
 const productSelector = document.getElementById('productSelector');
@@ -23,6 +39,8 @@ const crossSellingResults = document.getElementById('crossSellingResults');
 // Event listeners
 form.addEventListener('submit', handleFormSubmit);
 downloadBtn.addEventListener('click', downloadResults);
+if (saveSupabaseBtn) saveSupabaseBtn.addEventListener('click', saveAnalysisToSupabase);
+if (openHistoryModalBtn) openHistoryModalBtn.addEventListener('click', openHistoryModal);
 productSelector.addEventListener('change', handleProductSelection);
 showCrossBtn.addEventListener('click', showCrossSellingAnalysis);
 window.addEventListener('load', testBackendConnection);
@@ -97,6 +115,7 @@ async function handleFormSubmit(e) {
         
         showAlert(message, rulesCount > 0 ? 'success' : 'warning');
         downloadBtn.classList.remove('d-none');
+        if (saveSupabaseBtn) saveSupabaseBtn.classList.remove('d-none');
         
     } catch (error) {
         console.error('Error:', error);
@@ -668,9 +687,207 @@ function formatNumber(num, decimals = 2) {
     return parseFloat(num).toFixed(decimals);
 }
 
+// Escape HTML utility
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Local storage backup functions
+function saveToLocalBackup(record) {
+    try {
+        const local = getLocalBackup();
+        local.unshift({ ...record, id: 'local_' + Date.now(), created_at: new Date().toISOString() });
+        localStorage.setItem('mba_local_history', JSON.stringify(local.slice(0, 20)));
+    } catch(e) {}
+}
+
+function getLocalBackup() {
+    try {
+        const data = localStorage.getItem('mba_local_history');
+        return data ? JSON.parse(data) : [];
+    } catch(e) {
+        return [];
+    }
+}
+
+// Save Analysis to Supabase Cloud
+async function saveAnalysisToSupabase() {
+    if (!analysisResults) {
+        showAlert('⚠️ No analysis results to save. Please run an analysis first.', 'warning');
+        return;
+    }
+    
+    const saveBtn = document.getElementById('saveSupabaseBtn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+    }
+    
+    try {
+        const fileInput = document.getElementById('csvFile');
+        const fileName = (fileInput && fileInput.files[0]) ? fileInput.files[0].name : 'Transaction_Dataset.csv';
+        
+        const record = {
+            dataset_name: fileName,
+            algorithm: analysisResults.algorithm || document.getElementById('algorithm').value,
+            min_support: parseFloat(document.getElementById('minSupport').value),
+            min_confidence: parseFloat(document.getElementById('minConfidence').value),
+            min_lift: parseFloat(document.getElementById('minLift').value),
+            total_rules: analysisResults.rules ? analysisResults.rules.length : 0,
+            total_items: analysisResults.frequent_items ? analysisResults.frequent_items.length : 0,
+            total_transactions: analysisResults.analysis_info ? analysisResults.analysis_info.total_transactions : 0,
+            results: analysisResults
+        };
+        
+        let savedToCloud = false;
+        
+        if (supabaseClient) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('market_basket_analyses')
+                    .insert([record])
+                    .select();
+                    
+                if (!error) {
+                    savedToCloud = true;
+                } else {
+                    console.warn('Supabase DB notice:', error.message);
+                }
+            } catch (sbErr) {
+                console.warn('Supabase request error:', sbErr);
+            }
+        }
+        
+        // Always maintain local copy
+        saveToLocalBackup(record);
+        
+        if (savedToCloud) {
+            showAlert('☁️ Analysis successfully saved to Supabase Cloud!', 'success');
+        } else {
+            showAlert('💾 Analysis saved to your History! (To sync to Supabase table, run supabase_schema.sql in Supabase SQL editor)', 'info');
+        }
+    } catch (err) {
+        console.error('Save error:', err);
+        showAlert(`❌ Failed to save: ${err.message}`, 'danger');
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-cloud-arrow-up me-1"></i>Save to Cloud';
+        }
+    }
+}
+
+// Open and Load Cloud History Modal
+async function openHistoryModal() {
+    const modalEl = document.getElementById('historyModal');
+    if (!modalEl) return;
+    
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    
+    const loadingEl = document.getElementById('historyLoading');
+    const listContainer = document.getElementById('historyListContainer');
+    const emptyEl = document.getElementById('historyEmpty');
+    const tbody = document.getElementById('historyTableBody');
+    
+    if (loadingEl) loadingEl.classList.remove('d-none');
+    if (listContainer) listContainer.classList.add('d-none');
+    if (emptyEl) emptyEl.classList.add('d-none');
+    if (tbody) tbody.innerHTML = '';
+    
+    let records = [];
+    
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('market_basket_analyses')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(25);
+                
+            if (!error && data && data.length > 0) {
+                records = data;
+            }
+        } catch (e) {
+            console.warn('Could not fetch from Supabase:', e);
+        }
+    }
+    
+    // Fallback to local records if cloud is empty or uninitialized
+    if (records.length === 0) {
+        const local = getLocalBackup();
+        if (local && local.length > 0) {
+            records = local;
+        }
+    }
+    
+    if (loadingEl) loadingEl.classList.add('d-none');
+    
+    if (records.length === 0) {
+        if (emptyEl) emptyEl.classList.remove('d-none');
+        return;
+    }
+    
+    if (listContainer) listContainer.classList.remove('d-none');
+    window._cachedHistory = records;
+    
+    records.forEach((rec, idx) => {
+        const row = tbody.insertRow();
+        const dateStr = rec.created_at ? new Date(rec.created_at).toLocaleString() : 'Recently';
+        row.innerHTML = `
+            <td>
+                <i class="fas fa-file-csv text-primary me-1"></i>
+                <span class="fw-semibold">${escapeHtml(rec.dataset_name || 'Dataset')}</span>
+            </td>
+            <td><span class="badge bg-secondary">${escapeHtml(rec.algorithm || 'Apriori')}</span></td>
+            <td><span class="badge bg-success">${rec.total_rules || (rec.results && rec.results.rules ? rec.results.rules.length : 0)} rules</span></td>
+            <td class="small text-muted">${dateStr}</td>
+            <td>
+                <button type="button" class="btn btn-sm btn-primary" onclick="loadSavedAnalysis(${idx})">
+                    <i class="fas fa-arrow-rotate-right me-1"></i> Load
+                </button>
+            </td>
+        `;
+    });
+}
+
+// Load a specific historical analysis
+function loadSavedAnalysis(index) {
+    if (!window._cachedHistory || !window._cachedHistory[index]) return;
+    const record = window._cachedHistory[index];
+    const results = record.results;
+    if (!results) return;
+    
+    analysisResults = results;
+    crossSellingData = results.cross_selling_data || {};
+    
+    displayResults(results);
+    setupCrossSellingInterface();
+    
+    // Sync parameter fields if available
+    if (record.min_support) document.getElementById('minSupport').value = record.min_support;
+    if (record.min_confidence) document.getElementById('minConfidence').value = record.min_confidence;
+    if (record.min_lift) document.getElementById('minLift').value = record.min_lift;
+    if (record.algorithm) document.getElementById('algorithm').value = record.algorithm;
+    
+    downloadBtn.classList.remove('d-none');
+    if (saveSupabaseBtn) saveSupabaseBtn.classList.remove('d-none');
+    
+    const modalEl = document.getElementById('historyModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) modalInstance.hide();
+    
+    showAlert(`✅ Loaded analysis for "${escapeHtml(record.dataset_name)}" (${record.total_rules || results.rules.length} rules, ${record.algorithm || results.algorithm})`, 'success');
+}
+
 // Initialize tooltips
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Bootstrap tooltips if needed
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
